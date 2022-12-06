@@ -11,7 +11,11 @@ from tqdm import tqdm, trange
 # merge_list = ["bq_corpus", "lcqmc", "oppo", "paws-x-zh"]
 merge_list = ["bq_corpus", "lcqmc", "oppo"]
 
-filter_pattern = ["小布"]
+filter_pattern = [
+    "hello\W*", "hi\W*", "hey\W*",
+    "哈喽\W*", "嗨\W*", "你好\W*", "您好\W*", "嗯\W*", "啊\W*", "嘿\W*", "阿\W*",
+    "小布\W*", "小爱同学\W*", "小步\W*", "小度\W*", "小o\W*", "小冰小冰\W*", "siri\W*"
+]
 
 try:
     paddle.set_device("gpu")
@@ -66,13 +70,58 @@ def read_data() -> Tuple[List[str]]:
     return train_data, dev_data, test_data
 
 
-# filter out certain words
+# filter out meaningless characters
 def _fiter(data: List[str]) -> List[str]:
+    data_filter = []
+
+    for item in data:  # ["A", "B", "label"]
+        item_filter = []
+
+        for text in item:
+            text_filter = text
+            for pattern in filter_pattern:
+                text_filter = re.sub(pattern, "", text_filter)
+            item_filter.append(text_filter)
+
+        if len(item_filter[0]) == 0 or len(item_filter[1]) == 0:  # one sequence is meaningless
+            # if is train or dev set -> drop this data
+            if len(item_filter) > 2:
+                continue
+            # if in test set -> keep but modify
+            item_filter[0] = "N/A" if len(item_filter[0]) == 0 else item[0]
+            item_filter[1] = "N/A" if len(item_filter[1]) == 0 else item[1]
+
+        data_filter.append(item_filter)  # use this data
+
+    return data_filter
+
+
+def longest_common_prefix(str_A: str, str_B: str) -> int:
+    for i in range(len(str_A)):
+        c = str_A[i]
+        if (i == len(str_B) or str_B[i] != c):
+            return i
+    return 0
+
+
+def longest_common_suffix(str_A: str, str_B: str) -> int:
+    for i in range(-1, -len(str_A)-1, -1):
+        c = str_A[i]
+        if (i == -len(str_B)-1 or str_B[i] != c):
+            return -i-1
+    return 0
+
+
+def _truncate(data: List[str]) -> List[str]:
     data_tmp = data
     for item in data_tmp:
-        for text in item:
-            for pattern in filter_pattern:
-                text = re.sub(pattern, "", text)
+        prefix_len = longest_common_prefix(item[0], item[1])
+        item[0] = item[0][prefix_len:]
+        item[1] = item[1][prefix_len:]
+        suffix_len = longest_common_suffix(item[0], item[1])
+        if suffix_len > 0:
+            item[0] = item[0][:-suffix_len]
+            item[1] = item[1][:-suffix_len]
     data_clean = data_tmp
     return data_clean
 
@@ -90,7 +139,7 @@ def get_errors(corrected_text, origin_text):
 
         if i+1 < len(corrected_text):
             ori_2gram = "".join([origin_text[i], origin_text[i+1]])
-            if ori_2gram in ["微粒", "粒贷"]:
+            if ori_2gram in ["微粒", "粒贷", "余额", "到账", "转账"]:
                 # add unk word
                 corrected_text = corrected_text[:i] + ori_2gram + corrected_text[i+2:]
                 continue
@@ -105,13 +154,17 @@ def get_errors(corrected_text, origin_text):
     return corrected_text, sub_details
 
 
-def macbert4csc(texts):
+def macbert4csc(texts):  # np.array[str] -> np.array[str]
     texts = list(texts)
     with paddle.no_grad():
         outputs = model(**tokenizer(texts, padding=True, return_tensors="pd"))
 
     result = []
     for ids, text in zip(outputs, texts):
+        if text == "N/A":  # skip the correction for meaningless sequence
+            result.append(text)
+            continue
+
         _text = tokenizer.decode(
             paddle.argmax(ids, axis=-1), skip_special_tokens=True
         ).replace(" ", "")
@@ -122,21 +175,23 @@ def macbert4csc(texts):
 
 
 def _correct(data: List[str]) -> List[str]:
-    data_tmp = np.array(data)
+    data_tmp = np.array(data)  # we want slicing
 
     data_tmp[:, 0] = macbert4csc(data_tmp[:, 0])
     data_tmp[:, 1] = macbert4csc(data_tmp[:, 1])
 
+    for item in data_tmp:
+        if not item[-1].endswith("\n"):
+            item[-1] += "\n"
     data_clean = ["\t".join(item) for item in data_tmp]
     return data_clean
 
 
 def _clean(data: List[str]) -> List[str]:
-    data_tmp = data
-    data_tmp = _fiter(data_tmp)
-    data_tmp = _correct(data_tmp)
-    data_clean = data_tmp
-    return data_clean
+    data_filter = _fiter(data)
+    # data_truncate = _truncate(data_filter)
+    data_correct = _correct(data_filter)
+    return data_correct
 
 
 def clean_data(dataset: List[str]) -> List[str]:
