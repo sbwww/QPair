@@ -19,15 +19,28 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 
 
+class BiLSTM_Layer(nn.Layer):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.bilstm = nn.LSTM(self.hidden_size, self.hidden_size, direction="bidirectional")
+
+    def forward(self, seq_output):
+        rnn_out, (hidden, last_cell) = self.bilstm(seq_output)
+        last_hidden = paddle.concat((hidden[-2, :, :], hidden[-1, :, :]), axis=1)  # TODO：what does BiLSTM look like?
+        return last_hidden
+
+
 class QuestionMatching(nn.Layer):
 
     def __init__(self, pretrained_model, dropout=None, rdrop_coef=0.0):
         super().__init__()
         self.ptm = pretrained_model
+        self.bilstm = BiLSTM_Layer(self.ptm.config["hidden_size"])
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
         self.num_labels = 2  # (similar or dissimilar)
-        self.classifier = nn.Linear(self.ptm.config["hidden_size"], self.num_labels)
+        self.classifier = nn.Linear(self.ptm.config["hidden_size"]*2, self.num_labels)
         self.rdrop_coef = rdrop_coef
         self.rdrop_loss = ppnlp.losses.RDropLoss()
 
@@ -40,9 +53,10 @@ class QuestionMatching(nn.Layer):
         do_evaluate=False
     ):
 
-        _, cls_embedding1 = self.ptm(input_ids, token_type_ids, position_ids,
-                                     attention_mask)
-        cls_embedding1 = self.dropout(cls_embedding1)
+        seq_output, _ = self.ptm(input_ids, token_type_ids, position_ids,
+                                 attention_mask)
+        rnn_output = self.bilstm(seq_output)
+        cls_embedding1 = self.dropout(rnn_output)
         logits1 = self.classifier(cls_embedding1)
 
         # For more information about R-drop please refer to this paper: https://arxiv.org/abs/2106.14448

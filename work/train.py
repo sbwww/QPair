@@ -41,6 +41,12 @@ fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 logger = logging.getLogger()
 
+try:
+    paddle.set_device("gpu")
+except:
+    paddle.set_device("cpu")
+    print("No CUDA, use cpu instead.")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name_or_path",
                     type=str,
@@ -146,7 +152,7 @@ def evaluate(model,
     losses = []
     total_num = 0
 
-    for batch in dataloader:
+    for batch in tqdm(dataloader, desc="Batch"):
         input_ids, token_type_ids, labels = batch
         total_num += len(labels)
         logits, _ = model(input_ids=input_ids,
@@ -158,7 +164,7 @@ def evaluate(model,
         metric.update(correct)
         accu = metric.accumulate()
 
-    print("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(
+    logger.info("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(
         np.mean(losses), accu, total_num))
     model.train()
     metric.reset()
@@ -166,7 +172,6 @@ def evaluate(model,
 
 
 def do_train():
-    paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()

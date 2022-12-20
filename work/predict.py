@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import csv
 import os
 import random
 import sys
@@ -29,6 +30,13 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 from tqdm import tqdm, trange
 
 from data_util import convert_example, create_dataloader, read_text_pair
+from asym_swap import process_batch
+
+try:
+    paddle.set_device("gpu")
+except:
+    paddle.set_device("cpu")
+    print("No CUDA, use cpu instead.")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name_or_path",
@@ -74,7 +82,7 @@ def predict(model, dataloader):
     model.eval()
 
     with paddle.no_grad():
-        for _batch in tqdm(dataloader, desc="Iteration"):
+        for _batch in tqdm(dataloader, desc="test"):
             input_ids, token_type_ids = _batch
 
             input_ids = paddle.to_tensor(input_ids)
@@ -91,10 +99,10 @@ def predict(model, dataloader):
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device)
-
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    # pretrained_model = AutoModel.from_pretrained("ernie-gram-zh")
+    # tokenizer = AutoTokenizer.from_pretrained("ernie-gram-zh")
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -110,7 +118,8 @@ if __name__ == "__main__":
                            data_path=args.input_file,
                            is_test=True,
                            lazy=False)
-
+    # test_ds is a iterable of dict
+    # {'query1': '手电筒打不开怎么回事？', 'query2': '手电筒打不开怎么回事'}
     test_dataloader = create_dataloader(test_ds,
                                         mode="predict",
                                         batch_size=args.batch_size,
@@ -129,6 +138,21 @@ if __name__ == "__main__":
 
     y_probs = predict(model, test_dataloader)
     y_preds = np.argmax(y_probs, axis=1)
+
+    with open("./data/neg_id.csv", "r", encoding="utf8") as file_read:
+        neg_list = list(csv.reader(file_read))[0]
+        for idx in neg_list:
+            y_preds[int(idx)] = 1-int(y_preds[int(idx)])
+
+    with open("./data/na_id.csv", "r", encoding="utf8") as file_read:
+        na_list = list(csv.reader(file_read))[0]
+        for idx in na_list:
+            y_preds[int(idx)] = 0
+
+    with open("./data/temporal_id.csv", "r", encoding="utf8") as file_read:
+        temporal_list = list(csv.reader(file_read))[0]
+        for idx in temporal_list:
+            y_preds[int(idx)] = 0
 
     with open(args.result_file, "w", encoding="utf-8") as f:
         for y_pred in y_preds:
