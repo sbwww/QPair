@@ -69,18 +69,18 @@ if __name__ == "__main__":
 
     print("total name 0: {0}".format(len(list_name_0)))
     print(list_name_0)
-    with open("./data/name_id.csv", "w", encoding="utf8") as file_write:
+    with open("../data/feature_data/name_id.csv", "w", encoding="utf8") as file_write:
         csvwriter = csv.writer(file_write)
         csvwriter.writerow(list_name_0)
 
     print("total pinyin 1: {0}".format(len(list_pinyin_1)))
     print(list_pinyin_1)
-    with open("./data/pinyin_id.csv", "w", encoding="utf8") as file_write:
+    with open("../data/feature_data/pinyin_id.csv", "w", encoding="utf8") as file_write:
         csvwriter = csv.writer(file_write)
         csvwriter.writerow(list_pinyin_1)
 
     print("total beiba 1: {0}".format(len(list_pinyin_1)))
     print(list_beiba_1)
-    with open("./data/beiba_id.csv", "w", encoding="utf8") as file_write:
+    with open("../data/feature_data/beiba_id.csv", "w", encoding="utf8") as file_write:
         csvwriter = csv.writer(file_write)
         csvwriter.writerow(list_beiba_1)

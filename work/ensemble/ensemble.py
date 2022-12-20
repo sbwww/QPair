@@ -24,32 +24,32 @@ def ensemble():
 
 
 def check_rules(preds):
-    with open("./data/neg_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/neg_id.csv", "r", encoding="utf8") as file_read:
         neg_list = list(csv.reader(file_read))[0]
         for idx in neg_list:
             preds[int(idx)] = 1-int(preds[int(idx)])
 
-    with open("./data/beiba_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/beiba_id.csv", "r", encoding="utf8") as file_read:
         beiba_list = list(csv.reader(file_read))[0]
         for idx in beiba_list:
             preds[int(idx)] = 1
 
-    with open("./data/pinyin_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/pinyin_id.csv", "r", encoding="utf8") as file_read:
         pinyin_list = list(csv.reader(file_read))[0]
         for idx in pinyin_list:
             preds[int(idx)] = 1
 
-    with open("./data/na_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/na_id.csv", "r", encoding="utf8") as file_read:
         na_list = list(csv.reader(file_read))[0]
         for idx in na_list:
             preds[int(idx)] = 0
 
-    with open("./data/temporal_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/temporal_id.csv", "r", encoding="utf8") as file_read:
         temporal_list = list(csv.reader(file_read))[0]
         for idx in temporal_list:
             preds[int(idx)] = 0
 
-    with open("./data/name_id.csv", "r", encoding="utf8") as file_read:
+    with open("./data/feature_data/name_id.csv", "r", encoding="utf8") as file_read:
         name_list = list(csv.reader(file_read))[0]
         for idx in name_list:
             preds[int(idx)] = 0

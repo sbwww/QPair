@@ -136,7 +136,7 @@ def save_swap_data(test_data: List[str]):
 
 
 def save_neg_list(neg_list: List[int]):
-    save_path = "../data/neg_id.csv"
+    save_path = "../data/feature_data/neg_id.csv"
     print("total neg: {0}".format(len(neg_list)))
     print("save to {0}".format(save_path))
     with open(save_path, "w", encoding="utf8") as file_write:

@@ -58,8 +58,6 @@ def filter_one(data: str) -> Tuple[Optional[str], Optional[bool]]:
         text_filter = text
         for pattern, repl in filter_pattern.items():
             text_filter = re.sub(pattern, repl, text_filter)
-            if "哦你知道" in text_filter:
-                print(text_filter)
         data_swapped.append(text_filter)
 
     if len(data_swapped[0]) == 0 or len(data_swapped[1]) == 0:  # one sequence is meaningless
@@ -121,7 +119,7 @@ def _truncate(data: List[List[str]]) -> List[List[str]]:
 
 
 def save_na_list(na_list):
-    with open("../data/na_id.csv", "w", encoding="utf8") as file_write:
+    with open("../data/feature_data/na_id.csv", "w", encoding="utf8") as file_write:
         csvwriter = csv.writer(file_write)
         csvwriter.writerow(na_list)
 

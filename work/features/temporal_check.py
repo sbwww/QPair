@@ -25,7 +25,7 @@ def is_diff_temporal(item_split: List[str]) -> bool:
 
 
 def save_temporal_list(temporal_list):
-    save_path = "../data/temporal_id.csv"
+    save_path = "../data/feature_data/temporal_id.csv"
     print("total temporal: {0}".format(len(temporal_list)))
     print("save to {0}".format(save_path))
     with open(save_path, "w", encoding="utf8") as file_write:
