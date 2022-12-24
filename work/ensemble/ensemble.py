@@ -54,8 +54,6 @@ def check_rules(preds):
         for idx in name_list:
             preds[int(idx)] = 0
 
-    preds[58828] = 1
-
     return preds
 
 

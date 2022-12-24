@@ -1,6 +1,6 @@
 import csv
 import re
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 from tqdm import tqdm
 
@@ -27,24 +27,53 @@ def read_from_merge() -> Tuple[List[str]]:
     return test_data
 
 
-def full_to_abbr(dataset: List[str]) -> List[str]:
+def full_to_abbr_one(data: Union[str, List[Union[str, int]]],
+                     full_abbr_pairs=None) -> Union[str, List[Union[str, int]]]:
+    if full_abbr_pairs is None:
+        full_abbr_pairs = []
+        with open("../data/feature_data/abbr.txt", "r", encoding="utf8") as file_read:
+            full_abbr_pairs.append(file_read.readline().split("\t"))
+
+    if type(data) is str:
+        data_abbr = data.split("\t")
+    elif type(data) is list:
+        data_abbr = data
+    else:
+        raise ValueError("Unsupported data type {0}. Expecting str or list.".format(type(data)))
+
+    for pair in full_abbr_pairs:
+        data_abbr[0] = re.sub(pair[0], pair[1], data_abbr[0])
+        data_abbr[1] = re.sub(pair[0], pair[1], data_abbr[1])
+
+    if type(data) is str:
+        data_abbr = "\t".join(data_abbr)
+    return data_abbr
+
+
+def full_to_abbr_batch(dataset: Union[List[str],
+                                      List[List[Union[str, int]]]]) -> Union[List[str],
+                                                                             List[List[Union[str, int]]]]:
     full_abbr_pairs = []
     with open("../data/feature_data/abbr.txt", "r", encoding="utf8") as file_read:
         full_abbr_pairs.append(file_read.readline().split("\t"))
 
     data_filter = []
     for data in tqdm(dataset, desc="full_to_abbr"):
-        data_swapped = data.split("\t")
-        for pair in full_abbr_pairs:
-            data_swapped[0] = re.sub(pair[0], pair[1], data_swapped[0])
-            data_swapped[1] = re.sub(pair[0], pair[1], data_swapped[1])
-        data_filter.append("\t".join(data_swapped))
+        data_swapped = full_to_abbr_one(data, full_abbr_pairs)
+        data_filter.append(data_swapped)
 
     return data_filter
 
 
-def filter_one(data: str) -> Tuple[Optional[str], Optional[bool]]:
-    text_pair = data.split("\t")  # ["A", "B", "label"]
+def filter_one(data: Union[str, List[Union[str, int]]]) -> Tuple[Optional[Union[str, List[Union[str, int]]]],
+                                                                 Optional[bool]]:
+    if type(data) is str:
+        text_pair = data.split("\t")  # ["A", "B", "label"]
+    elif type(data) is list:
+        text_pair = data
+    else:
+        raise ValueError("Unsupported data type {0}. Expecting str or list.".format(type(data)))
+
     if text_pair[-1].endswith("\n"):
         text_pair[-1] = text_pair[-1][:-1]
 
@@ -70,9 +99,10 @@ def filter_one(data: str) -> Tuple[Optional[str], Optional[bool]]:
         if data_swapped[0] == "N/A" or data_swapped[1] == "N/A":
             is_na = True
 
-    data_swapped = "\t".join(data_swapped)
-    if not data_swapped.endswith("\n"):
-        data_swapped += "\n"
+    if type(data) is str:
+        data_swapped = "\t".join(data_swapped)
+        if not data_swapped.endswith("\n"):
+            data_swapped += "\n"
     return data_swapped, is_na
 
 

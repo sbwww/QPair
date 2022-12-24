@@ -1,9 +1,8 @@
 import csv
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from paddlenlp import Taskflow
 from tqdm import tqdm
 
-gru_crf_pos_tagging = Taskflow("pos_tagging", user_dict="../data/feature_data/user_dict.txt")
 
 # print(gru_crf_pos_tagging(["刘德华比张学友的年龄大几岁", "张学友比刘德华岁数小多少"]))
 # print(gru_crf_pos_tagging(["拜登比特朗普大多少岁", "特朗普比拜登小多少岁"]))
@@ -36,6 +35,7 @@ def is_sym(token_tag: List[str]) -> bool:
 
 
 def is_neg_asym(token_tag: List[str]) -> bool:
+    # TODO: find an antonym
     return token_tag[0] in ["比"] and token_tag[1] in ["p"]
 
 
@@ -44,16 +44,14 @@ def is_asym(token_tag: List[str]) -> bool:
 
 
 def is_equal(text: str) -> bool:
-    # 西安到北京高铁多长时间	北京到西安高铁多长时间  1
-    # 不能直接用token，可能不是这样分词的，要在原句子中找这些词
-    # TODO: 核对 能提示等价性的 phrase
+    # TODO: check the equal sign phrase
     for phrase in ["高速费", "邮费", "多远", "多少公里", "距离", "多久", "多长时间"]:
         if phrase in text:
             return True
     return False
 
 
-def swap_seq_2(text_pair: List[str]) -> Tuple[List[str], bool]:
+def swap_seq_2(gru_crf_pos_tagging, text_pair: List[str]) -> Tuple[List[str], bool]:
     outputs = gru_crf_pos_tagging(text_pair)
 
     tag_list_1, tag_list_2 = outputs[0], outputs[1]
@@ -112,7 +110,9 @@ def swap_seq_2(text_pair: List[str]) -> Tuple[List[str], bool]:
     tag_list_2[swap_point_left] = c
 
     # reconstruct text 2
-    text_pair[1] = "".join([token for token, tag in tag_list_2])
+    new_text_pair = []
+    new_text_pair.append("".join([token for token, tag in tag_list_1]))
+    new_text_pair.append("".join([token for token, tag in tag_list_2]))
 
     need_neg = False  # default, if is_sym, do not need to negate
     if is_neg_asym(tag_list_1[token_pivot_1]):
@@ -120,8 +120,10 @@ def swap_seq_2(text_pair: List[str]) -> Tuple[List[str], bool]:
     elif is_asym(tag_list_1[token_pivot_1]):
         if not is_equal(text_pair[0]):
             need_neg = True
+    if text_pair == new_text_pair:
+        need_neg = False
 
-    return text_pair, need_neg
+    return new_text_pair, need_neg
 
 
 def save_swap_data(test_data: List[str]):
@@ -144,30 +146,40 @@ def save_neg_list(neg_list: List[int]):
         csvwriter.writerow(neg_list)
 
 
-# data: "A    B    label"
-def swap_one(data: str) -> Tuple[str, bool]:
-    text_pair = data.split("\t")
-    text_pair, need_neg = swap_seq_2(text_pair)
-    data_swaped = "\t".join(text_pair)
-    return data_swaped, need_neg
-# return: "B    A    label", True/False
+# data: "A    B    label" | ["A", "B", label]
+def swap_one(gru_crf_pos_tagging, data: Union[str, List[Union[str, int]]]) -> Tuple[Union[str, List[Union[str, int]]], bool]:
+    if type(data) is str:
+        text_pair = data.split("\t")
+    elif type(data) is list:
+        text_pair = data
+    else:
+        raise ValueError("Unsupported data type {0}. Expecting str or list.".format(type(data)))
+
+    text_pair, need_neg = swap_seq_2(gru_crf_pos_tagging, text_pair)
+    if type(data) is str:
+        text_pair = "\t".join(text_pair)
+    return text_pair, need_neg
+# return: "A    B's    label" | ["A", "B's", label], True/False
 
 
-# data_list: ["A    B    label", ]
-def swap_batch(data_list: List[str]) -> Tuple[List[str], List[int]]:
+# data_list: ["A    B    label", ] | [ ["A", "B", label], ]
+def swap_batch(gru_crf_pos_tagging, data_list: Union[List[str], List[List[Union[str, int]]]]) -> Tuple[Union[List[str], List[List[Union[str, int]]]], List[int]]:
     neg_list = []
     for idx, data in enumerate(tqdm(data_list, desc="asym_swap")):
-        data_swaped, need_neg = swap_one(data)
-        data_list[idx] = data_swaped
+        data_swapped, need_neg = swap_one(gru_crf_pos_tagging, data)
+        if data_swapped == data:
+            need_neg = False
+        data_list[idx] = data_swapped
         if need_neg:
             neg_list.append(idx)
 
     return data_list, neg_list
-# return: ["B    A    label", ], [idx, ]
+# return: ["A    B's    label", ] | [ ["A", "B's", label], ], [idx, ]
 
 
 if __name__ == "__main__":
+    gru_crf_pos_tagging = Taskflow("pos_tagging", user_dict="../data/feature_data/user_dict.txt")
     test_data = read_from_merge()
-    test_data, neg_list = swap_batch(test_data)
+    test_data, neg_list = swap_batch(gru_crf_pos_tagging, test_data)
     save_swap_data(test_data)
     save_neg_list(neg_list)

@@ -30,7 +30,6 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 from tqdm import tqdm, trange
 
 from data_util import convert_example, create_dataloader, read_text_pair
-from asym_swap import process_batch
 
 try:
     paddle.set_device("gpu")
@@ -144,6 +143,16 @@ if __name__ == "__main__":
         for idx in neg_list:
             y_preds[int(idx)] = 1-int(y_preds[int(idx)])
 
+    with open("./data/feature_data/beiba_id.csv", "r", encoding="utf8") as file_read:
+        beiba_list = list(csv.reader(file_read))[0]
+        for idx in beiba_list:
+            y_preds[int(idx)] = 1
+
+    with open("./data/feature_data/pinyin_id.csv", "r", encoding="utf8") as file_read:
+        pinyin_list = list(csv.reader(file_read))[0]
+        for idx in pinyin_list:
+            y_preds[int(idx)] = 1
+
     with open("./data/feature_data/na_id.csv", "r", encoding="utf8") as file_read:
         na_list = list(csv.reader(file_read))[0]
         for idx in na_list:
@@ -152,6 +161,11 @@ if __name__ == "__main__":
     with open("./data/feature_data/temporal_id.csv", "r", encoding="utf8") as file_read:
         temporal_list = list(csv.reader(file_read))[0]
         for idx in temporal_list:
+            y_preds[int(idx)] = 0
+
+    with open("./data/feature_data/name_id.csv", "r", encoding="utf8") as file_read:
+        name_list = list(csv.reader(file_read))[0]
+        for idx in name_list:
             y_preds[int(idx)] = 0
 
     with open(args.result_file, "w", encoding="utf-8") as f:

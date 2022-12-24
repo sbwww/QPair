@@ -6,8 +6,9 @@ from typing import List, Optional, Tuple
 import paddle
 from asym_swap import swap_batch
 from correction import make_batch_and_correct
-from filter import filter_batch, full_to_abbr
+from filter import filter_batch, full_to_abbr_batch
 from temporal_check import temporal_batch
+from paddlenlp import Taskflow
 
 sys.path.append('/home/aistudio/external-libraries')
 
@@ -68,35 +69,22 @@ def read_from_merge() -> Tuple[List[str]]:
     return train_data, dev_data, test_data
 
 
-def write_data(train_data: Optional[List[str]] = None,
-               dev_data: Optional[List[str]] = None,
-               test_data: Optional[List[str]] = None):
-    if train_data is not None:
-        save_path = "../data/train_merge.tsv"
-        print("write {0} train to {1}".format(len(train_data), save_path))
-        with open(save_path, "w", encoding="utf8") as file_write:
-            for item in train_data:
-                if not item.endswith("\n"):
-                    item += "\n"
-                file_write.write(item)
+def save_feature_list(name, list):
+    save_path = "../data/feature_data/{0}_id.csv".format(name)
+    print("write {0} feature to {1}".format(name, save_path))
+    with open(save_path, "w", encoding="utf8") as file_write:
+        csvwriter = csv.writer(file_write)
+        csvwriter.writerow(list)
 
-    if dev_data is not None:
-        save_path = "../data/dev_merge.tsv"
-        print("write {0} dev to {1}".format(len(dev_data), save_path))
-        with open(save_path, "w", encoding="utf8") as file_write:
-            for item in dev_data:
-                if not item.endswith("\n"):
-                    item += "\n"
-                file_write.write(item)
 
-    if test_data is not None:
-        save_path = "../data/test_merge.tsv"
-        print("write {0} test to {1}".format(len(test_data), save_path))
-        with open(save_path, "w", encoding="utf8") as file_write:
-            for item in test_data:
-                if not item.endswith("\n"):
-                    item += "\n"
-                file_write.write(item)
+def save_data(name: str, data: List[str]):
+    save_path = "../data/{0}_merge.tsv".format(name)
+    print("write {0} {1} to {2}".format(len(data), name, save_path))
+    with open(save_path, "w", encoding="utf8") as file_write:
+        for item in data:
+            if not item.endswith("\n"):
+                item += "\n"
+            file_write.write(item)
 
 
 def browse_data(name, data1=None, data2=None, list=None):
@@ -115,6 +103,8 @@ def browse_data(name, data1=None, data2=None, list=None):
 
 
 if __name__ == "__main__":
+    gru_crf_pos_tagging = Taskflow("pos_tagging", user_dict="../data/feature_data/user_dict.txt")
+
     ori_train_data, ori_dev_data, ori_test_data = read_and_merge_from_raw(merge_list)
     # train_data, dev_data, test_data = read_from_merge()
     train_data, dev_data, test_data = ori_train_data, ori_dev_data, ori_test_data
@@ -125,25 +115,26 @@ if __name__ == "__main__":
     print("total dev: {0}".format(len(dev_data)))
     print("total test: {0}".format(len(test_data)))
 
-    dev_data = full_to_abbr(dev_data)
+    dev_data = full_to_abbr_batch(dev_data)
     dev_data, na_list = filter_batch(dev_data)
-    browse_data("N/A", data1=ori_dev_data, list=na_list)
-    browse_data("dev", data1=dev_data)
-    write_data(dev_data=dev_data)
+    browse_data(name="dev", data1=dev_data)
+    save_data(name="dev", data=dev_data)
 
-    train_data = full_to_abbr(train_data)
+    train_data = full_to_abbr_batch(train_data)
     train_data, na_list = filter_batch(train_data)
-    browse_data("N/A", data1=ori_train_data, list=na_list)
-    browse_data("train", data1=train_data)
-    write_data(train_data=train_data)
+    browse_data(name="train", data1=train_data)
+    save_data(name="train", data=train_data)
 
-    test_data = full_to_abbr(test_data)
+    test_data = full_to_abbr_batch(test_data)
     test_data, na_list = filter_batch(test_data)
-    browse_data("N/A", data1=ori_test_data, data2=test_data, list=na_list)
-    test_data, neg_list = swap_batch(test_data)
-    browse_data("neg", data1=ori_test_data, data2=test_data, list=neg_list)
+    browse_data(name="N/A", data1=ori_test_data, data2=test_data, list=na_list)
+    save_feature_list("na", na_list)
+    test_data, neg_list = swap_batch(gru_crf_pos_tagging, test_data)
+    browse_data(name="neg", data1=ori_test_data, data2=test_data, list=neg_list)
+    save_feature_list("neg", neg_list)
     temporal_list = temporal_batch(test_data)
-    browse_data("temporal", data1=ori_test_data, data2=test_data, list=temporal_list)
-    test_data = make_batch_and_correct(test_data)
-    browse_data("test", data1=test_data)
-    write_data(test_data=test_data)
+    browse_data(name="temporal", data1=ori_test_data, list=temporal_list)
+    save_feature_list("temporal", temporal_list)
+    # test_data = make_batch_and_correct(test_data)
+    browse_data(name="test", data1=test_data)
+    save_data(name="test", data=test_data)

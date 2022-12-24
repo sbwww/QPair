@@ -32,6 +32,7 @@ from tqdm import tqdm, trange
 
 from data_util import convert_example, create_dataloader, read_text_pair
 from model import QuestionMatching
+from adv import FGM
 
 log_format = "%(asctime)s %(message)s"
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -214,6 +215,7 @@ def do_train():
                                        trans_fn=trans_func)
 
     model = QuestionMatching(pretrained_model, rdrop_coef=args.rdrop_coef)
+    fgm = FGM(model=model, eps=1)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -266,6 +268,19 @@ def do_train():
             global_step += 1
 
             loss.backward()
+
+            # FGM
+            fgm.attack()
+            logits1, kl_loss = model(input_ids=input_ids, token_type_ids=token_type_ids)
+            ce_loss = nn.CrossEntropyLoss()(logits1, labels)
+            if kl_loss > 0:
+                loss_adv = ce_loss + kl_loss * args.rdrop_coef
+            else:
+                loss_adv = ce_loss
+
+            loss_adv.backward()
+            fgm.restore()
+
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()

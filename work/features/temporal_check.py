@@ -1,5 +1,5 @@
 import csv
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from tqdm import tqdm
 
 
@@ -33,29 +33,32 @@ def save_temporal_list(temporal_list):
         csvwriter.writerow(temporal_list)
 
 
-# data: "A    B    label"
-def temporal_one(data: str) -> Tuple[str, bool]:
-    text_pair = data.split("\t")
+# data: "A    B    label" | ["A", "B", label]
+def temporal_one(data: Union[str, List[Union[str, int]]]) -> Tuple[Union[str, List[Union[str, int]]], bool]:
+    if type(data) is str:
+        text_pair = data.split("\t")
+    elif type(data) is list:
+        text_pair = data
+    else:
+        raise ValueError("Unsupported data type {0}. Expecting str or list.".format(type(data)))
     is_diff = is_diff_temporal(text_pair)
     return is_diff
-# return: "B    A    label", True/False
+# return: True/False
 
 
-# data_list: ["A    B    label", ]
-def temporal_batch(data_list: List[str]) -> Tuple[List[str], List[int]]:
+# data_list: ["A    B    label", ] | [ ["A", "B", label], ]
+def temporal_batch(data_list: Union[List[str],
+                                    List[List[Union[str, int]]]]) -> Tuple[Union[List[str],
+                                                                           List[List[Union[str, int]]]],
+                                                                           List[int]]:
     temporal_list = []
     for idx, data in enumerate(tqdm(data_list)):
         is_diff = temporal_one(data)
         if is_diff:
             temporal_list.append(idx)
 
-    print("total temporal: {0}".format(len(temporal_list)))
-    print(temporal_list)
-    for i in range(min(5, len(temporal_list))):
-        print(data_list[i])
-
     return temporal_list
-# return: ["B    A    label", ], [idx, ]
+# return: [idx, ]
 
 
 if __name__ == "__main__":
